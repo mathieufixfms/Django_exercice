@@ -2,54 +2,124 @@ import datetime
 
 from django.db import models
 from django.utils import timezone
-from django.db.models import Sum
-
-MAX_LENGTH = 20
-
-def text_excerpt(text, max_length):
-    return text[:max_length] + ('...' if len(text) > max_length else '')
 
 
 class Question(models.Model):
     question_text = models.CharField(max_length=200)
-    pub_date = models.DateTimeField('date published')
+    pub_date = models.DateTimeField("date de publication")
 
     def __str__(self):
-        return "{} {}".format(self.pub_date, text_excerpt(self.question_text, MAX_LENGTH))
+        """
+        Affiche les 20 premiers caractères de la question
+        ainsi que sa date de publication.
+        """
+        return f"{self.question_text[:20]} - {self.pub_date}"
 
     def was_published_recently(self):
-        return self.pub_date >= timezone.now() - datetime.timedelta(days=1)
+        """
+        Retourne True si la question a été publiée
+        durant les dernières 24 heures.
+        """
+        now = timezone.now()
+
+        return (
+            now - datetime.timedelta(days=1)
+            <= self.pub_date
+            <= now
+        )
 
     def age(self):
+        """
+        Calcule l'âge de la question depuis sa publication.
+        """
         return timezone.now() - self.pub_date
 
     def get_choices(self):
+        """
+        Retourne une liste contenant :
+        - le texte du choix,
+        - son nombre de votes,
+        - sa proportion de votes en pourcentage.
+        """
         choices = self.choice_set.all()
-        resultat = self.choice_set.aggregate(total=Sum('votes'))
-        total = resultat['total']
-        return [(c.choice_text, c.votes, c.votes / total) for c in choices]
+
+        total_votes = sum(
+            choice.votes
+            for choice in choices
+        )
+
+        result = []
+
+        for choice in choices:
+
+            if total_votes > 0:
+                proportion = (
+                    choice.votes / total_votes
+                ) * 100
+            else:
+                proportion = 0
+
+            result.append(
+                (
+                    choice.choice_text,
+                    choice.votes,
+                    proportion
+                )
+            )
+
+        return result
 
     def get_max_choice(self):
-        choices = self.choice_set.all()
-        resultat = self.choice_set.aggregate(total=Sum('votes'))
-        total = resultat['total']
-        max_choice = max(choices, key=lambda c: c.votes / total)
-        return (max_choice.choice_text, max_choice.votes / total)
+        """
+        Retourne le choix ayant obtenu le plus de votes
+        ainsi que son nombre de votes et sa proportion.
+        """
+        choices = list(self.choice_set.all())
 
-        # solution TRS (max renommé max_choice)
-        total = 0
-        choices = self.choice_set.all()
-        max_choice = choices[0]
-        for c in choices:
-            total += c.votes
-            if c.votes > max_choice.votes:
-                max_choice = c
-        return (max_choice.choice_text, max_choice.votes / total)
+        if not choices:
+            return None
+
+        max_choice = max(
+            choices,
+            key=lambda choice: choice.votes
+        )
+
+        total_votes = sum(
+            choice.votes
+            for choice in choices
+        )
+
+        if total_votes > 0:
+            proportion = (
+                max_choice.votes / total_votes
+            ) * 100
+        else:
+            proportion = 0
+
+        return (
+            max_choice.choice_text,
+            max_choice.votes,
+            proportion
+        )
+
 
 class Choice(models.Model):
-    question = models.ForeignKey(Question, on_delete=models.CASCADE)
-    choice_text = models.CharField(max_length=200)
-    votes = models.IntegerField(default=0)
+    question = models.ForeignKey(
+        Question,
+        on_delete=models.CASCADE
+    )
+
+    choice_text = models.CharField(
+        max_length=200
+    )
+
+    votes = models.IntegerField(
+        default=0
+    )
 
     def __str__(self):
-        return text_excerpt(self.choice_text, MAX_LENGTH)
+        """
+        Affiche uniquement les 20 premiers caractères
+        du texte du choix.
+        """
+        return self.choice_text[:20]

@@ -1,20 +1,45 @@
 from django.contrib import admin
-from .models import Question, Choice
 
+from .models import Question
+from .models import Choice
+
+
+#Ici l'admin des choix mais à part
+class ChoiceAdmin(admin.ModelAdmin):
+    list_display = ("question", "choice_text", "votes")
+    list_filter = ("question","votes",)
+    search_fields = ("choice_text",)
+    ordering = ("-question","-votes")
+
+# admin.site.register(Choice)
+admin.site.register(Choice, ChoiceAdmin)
+
+# Version choix en ligne qui prend trop de place, alors on va prendre l'option tableau (ligne ci-dessous)
+#class ChoiceInline(admin.StackedInline):
+class ChoiceInline(admin.TabularInline):
+    model = Choice
+    extra = 3
 
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ["id", "question_text", "pub_date"]
-    list_filter = ["pub_date"]
-    ordering = ["pub_date"]
-    search_fields = ["question_text"]
+    # Champs qui seront affichés dans la liste
+    list_display = ["question_text", "pub_date", "was_published_recently"]
+    # Champs sur lesquels on pourra filtrer
+    list_filter = ("pub_date",)
+    # Champs pour la recherche
+    search_fields = ("question_text",)
+    # Ordre (décroissant de date)
+    ordering = ("-pub_date",)
 
+    # Pour ordonner les champs (c'est l'un ou l'autre soit fields soit fieldset)
+    # fields = ["pub_date", "question_text"]
 
-class ChoiceAdmin(admin.ModelAdmin):
-    list_display = ["id", "question", "choice_text", "votes"]
-    list_filter = ["question", "votes"]
-    ordering = ["question", "choice_text"]
-    search_fields = ["choice_text", "question__question_text"]
+    # Partager le formulaire en plusieurs sous-ensembles (fieldsets)
+    fieldsets = [
+        (None, {"fields": ["question_text"]}),
+        ("Date information", {"fields": ["pub_date"]}),
+    ]
+    # On intègre ici l'admin des choix au lieu d'avoir une admin séparée pour les choix
+    inlines = [ChoiceInline]
 
-
+# admin.site.register(Question)
 admin.site.register(Question, QuestionAdmin)
-admin.site.register(Choice, ChoiceAdmin)
